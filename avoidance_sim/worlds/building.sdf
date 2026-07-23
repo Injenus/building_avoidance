@@ -28,6 +28,7 @@
     </plugin>
 
     <scene>
+      <shadows>false</shadows>
       <ambient>1.0 1.0 1.0</ambient>
       <background>0.8 0.8 0.8</background>
       <sky></sky>
@@ -122,18 +123,50 @@
 
   
     <!-- Здание-препятствие: выше рабочей высоты полёта, перелететь нельзя -->
-    <model name="building">
+
+    <model name="b1">
       <static>true</static>
-      <pose>0 30 7.5 0 0 0</pose>
+      <pose>0.0 25.0 7.5 0 0 0</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>20 10 15</size></box></geometry>
+          <geometry><box><size>20.0 10.0 15.0</size></box></geometry>
         </collision>
         <visual name="visual">
-          <geometry><box><size>20 10 15</size></box></geometry>
+          <geometry><box><size>20.0 10.0 15.0</size></box></geometry>
           <material>
-            <ambient>0.75 0.35 0.25 1</ambient>
-            <diffuse>0.75 0.35 0.25 1</diffuse>
+            <ambient>0.75 0.35 0.25 1</ambient><diffuse>0.75 0.35 0.25 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="b2">
+      <static>true</static>
+      <pose>10.0 50.0 9.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>20.0 10.0 18.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>20.0 10.0 18.0</size></box></geometry>
+          <material>
+            <ambient>0.45 0.50 0.60 1</ambient><diffuse>0.45 0.50 0.60 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="b3">
+      <static>true</static>
+      <pose>-8.0 72.0 6.0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>16.0 10.0 12.0</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>16.0 10.0 12.0</size></box></geometry>
+          <material>
+            <ambient>0.55 0.55 0.40 1</ambient><diffuse>0.55 0.55 0.40 1</diffuse>
           </material>
         </visual>
       </link>

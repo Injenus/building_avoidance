@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>avoidance_sim</name>
+  <version>0.1.0</version>
+  <description>Сцена Gazebo со зданием, модель дрона с лидаром, запуск миссии</description>
+  <maintainer email="dev@example.com">dev</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>mavros</exec_depend>
+  <exec_depend>avoidance_planner</exec_depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>
