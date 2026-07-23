@@ -1,0 +1,4 @@
+# Параметры SITL для модели gazebo-iris.
+# Без них PreArm: "Motors: Check frame class and type" и мгновенный disarm.
+FRAME_CLASS 1    # квадрокоптер
+FRAME_TYPE  1    # схема X
