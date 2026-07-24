@@ -154,13 +154,35 @@ chmod +x install_geographiclib_datasets.sh && sudo ./install_geographiclib_datas
 Датасеты GeographicLib обязательны, без них `mavros_node` падает при старте.
 
 ### 6. Этот репозиторий
-
+Репозиторий обязан лежать внутри `src/` ROS-воркспейса — `run.sh` определяет корень воркспейса как две директории вверх от себя.
 ```bash
 mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
 git clone <URL этого репозитория> building-avoidance
 cd ~/ros2_ws && colcon build --symlink-install
 source install/setup.bash
 ```
+
+### 7. Проверка
+
+```bash
+echo $GZ_SIM_RESOURCE_PATH | grep ardupilot_gazebo   # не должно быть пусто
+which sim_vehicle.py mavproxy.py                      # оба должны найтись
+ros2 pkg list | grep avoidance                        # два пакета
+```
+
+Первая строка критична: без пути к моделям `ardupilot_gazebo` сцена откроется
+без дрона и без сообщения об ошибке. Переменные из шагов 1 и 3 должны быть
+в `~/.bashrc` — новый терминал их подхватит, текущий требует `source ~/.bashrc`.
+
+Полный прогон:
+
+```bash
+./scripts/run.sh
+```
+
+Ожидаемая последовательность в логе планировщика: `ожидание связи` →
+`GUIDED` → `арминг` → `взлёт` → `полёт по m-линии` → `встреча` →
+`обход границы` → `цель достигнута` → `посадка`.
 
 ---
 
