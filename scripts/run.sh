@@ -36,5 +36,9 @@ ARGS=()
 [ $# -ge 1 ] && ARGS+=("target_x:=$1")
 [ $# -ge 2 ] && ARGS+=("target_y:=$2")
 
+BA_RUNTIME="$HOME/.ba_runtime"
+mkdir -p "$BA_RUNTIME"
+cd "$BA_RUNTIME"   # SITL пишет eeprom.bin и terrain/ в cwd
+
 echo "лог: $LOG"
 ros2 launch avoidance_sim mission.launch.py "${ARGS[@]}" 2>&1 | tee "$LOG"

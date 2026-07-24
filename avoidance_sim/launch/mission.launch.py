@@ -29,7 +29,11 @@ def generate_launch_description():
     params_default = os.path.join(plan, 'config', 'mission.yaml')
     sitl_parm = os.path.join(sim, 'config', 'sitl.parm')
 
-    res = os.pathsep.join([os.path.join(sim, 'models'), os.path.join(sim, 'worlds')])
+    # Модель дрона ссылается на iris_with_standoffs и gimbal из
+    # ardupilot_gazebo — без этого пути Gazebo откроется без дрона.
+    res = os.pathsep.join([os.path.join(sim, 'models'), os.path.join(sim, 'worlds'),
+                           os.path.expanduser('~/ardupilot_gazebo/models'),
+                           os.path.expanduser('~/ardupilot_gazebo/worlds')])
     if os.environ.get('GZ_SIM_RESOURCE_PATH'):
         res += os.pathsep + os.environ['GZ_SIM_RESOURCE_PATH']
 

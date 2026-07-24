@@ -7,3 +7,9 @@ logs/
 *.BIN
 .vscode/
 .idea/
+
+# артефакты ArduPilot SITL
+eeprom.bin
+terrain/
+*.parm
+!avoidance_sim/config/sitl.parm
