@@ -54,7 +54,7 @@ class Planner(Node):
             'clearance': 6.0, 'detect_dist': 12.0, 'corridor_half': 2.5,
             'max_range': 15.0, 'mline_tol': 2.0, 'leave_margin': 3.0,
             'stuck_time': 6.0, 'stuck_move': 2.0, 'lidar_timeout': 1.5,
-            'smooth': 0.25, 'finish_action': 'land',
+            'smooth': 0.25, 'back_ignore': 3.0, 'finish_action': 'land',
         }
         for k, v in d.items():
             self.declare_parameter(k, v)
@@ -68,6 +68,7 @@ class Planner(Node):
         self.mtol, self.lmargin = g('mline_tol'), g('leave_margin')
         self.st_t, self.st_move = g('stuck_time'), g('stuck_move')
         self.lid_to, self.smooth = g('lidar_timeout'), g('smooth')
+        self.back = g('back_ignore')
         self.finish = g('finish_action')
 
         self.state = self.pos = self.scan = None
@@ -156,17 +157,37 @@ class Planner(Node):
             a += s.angle_increment
         return out
 
-    def blocked(self, pts, direction):
-        """Препятствие в прямоугольном коридоре по курсу."""
+    def blocked(self, pts, direction, rng=None):
+        """Препятствие в прямоугольном коридоре по курсу.
+
+        rng ограничивает глубину проверки. При уходе с границы смотреть надо
+        только на стену, которую огибаем сейчас: следующее здание вдалеке не
+        должно мешать вернуться на m-линию — по Bug2 оно даст свою точку
+        встречи, и обход начнётся заново уже для него.
+        """
         ux, uy = math.cos(direction), math.sin(direction)
+        rng = self.det if rng is None else rng
         lat = []
         for px, py, _, _ in pts:
             vx, vy = px - self.pos[0], py - self.pos[1]
             along = vx * ux + vy * uy
             off = -vx * uy + vy * ux
-            if 0.0 < along < self.det and abs(off) < self.half:
+            if 0.0 < along < rng and abs(off) < self.half:
                 lat.append(off)
         return (len(lat) > 0), lat
+
+    def wall_point(self, pts, gdir):
+        """Ближайшая точка ТОЙ стены, которую огибаем сейчас.
+
+        Лидар не различает объекты, поэтому просто ближайшая точка облака не
+        годится: пройдя здание, дрон видит его сзади ближе, чем следующее
+        впереди, начинает вести пройденную стену и наматывает вокруг неё круги.
+        Отбрасываем всё, что позади относительно направления на цель.
+        """
+        ux, uy = math.cos(gdir), math.sin(gdir)
+        fwd = [q for q in pts
+               if (q[0] - self.pos[0]) * ux + (q[1] - self.pos[1]) * uy > -self.back]
+        return min(fwd, key=lambda q: q[2]) if fwd else None
 
     def mline_offset(self):
         """Знаковое отклонение от m-линии старт->цель, м."""
@@ -244,19 +265,19 @@ class Planner(Node):
             # условие ухода по Bug2: снова на m-линии и ближе, чем в точке встречи
             on_m = abs(self.mline_offset()) < self.mtol
             closer = dist < self.hit_dist - self.lmargin
-            clear = not self.blocked(pts, gdir)[0]
+            clear = not self.blocked(pts, gdir, self.clr + 2.0)[0]
             if on_m and closer and clear and self.now() - self.t_phase > 2.0:
                 self.clr = self.clr0
                 self.hist.clear()
                 self.set_phase(Phase.GO)
                 return
 
-            if not pts:
-                # граница потеряна из виду — идём к цели, но продолжаем
-                # следить за прогрессом, зависать нельзя
+            near = self.wall_point(pts, gdir)
+            if near is None:
+                # впереди чисто: стена осталась позади — идём к цели,
+                # зависать нельзя, прогресс продолжаем считать
                 self.drive(math.cos(gdir), math.sin(gdir), vz)
             else:
-                near = min(pts, key=lambda p: p[2])
                 rmin, thmin = near[2], near[3]
                 tang = wrap(thmin + self.side * math.pi / 2.0)
                 corr = clamp((rmin - self.clr) * 0.35, -0.7, 0.7)

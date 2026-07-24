@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
-# Полный прогон миссии с логированием.
+# Полный прогон миссии.
 #   ./scripts/run.sh            — цель по умолчанию из mission.yaml
 #   ./scripts/run.sh 25 80      — target_x target_y
 #
-# set -u здесь не используется: setup.bash из ROS обращается
-# к неинициализированным переменным и падает при -u.
+# Сцена пересобирается из config/buildings.yaml и пакет переустанавливается:
+# launch читает мир из install/, куда файлы копируются, а не линкуются.
+# set -u не используется: setup.bash из ROS падает при -u.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO="$(dirname "$SCRIPT_DIR")"
+WS="$(cd "$REPO/../.." && pwd)"
 
 LOG_DIR="${LOG_DIR:-$HOME/ba_logs}"
 mkdir -p "$LOG_DIR"
@@ -16,10 +21,16 @@ cleanup() {
   sleep 2
 }
 trap cleanup EXIT INT TERM
-cleanup   # подчищаем хвосты прошлого прогона
+cleanup
 
 source /opt/ros/humble/setup.bash
-source "$HOME/ros2_ws/install/setup.bash"
+
+python3 "$SCRIPT_DIR/gen_world.py" || exit 1
+( cd "$WS" && colcon build --packages-select avoidance_sim avoidance_planner \
+    --symlink-install > /tmp/ba_build.log 2>&1 ) \
+  || { echo "сборка упала, см. /tmp/ba_build.log"; exit 1; }
+
+source "$WS/install/setup.bash"
 
 ARGS=()
 [ $# -ge 1 ] && ARGS+=("target_x:=$1")
