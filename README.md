@@ -66,7 +66,46 @@ Gazebo, ArduPilot SITL, MAVROS, мост и планировщик.
 
 ## Установка с нуля
 
-Порядок важен: каждый слой ставится и проверяется отдельно.
+## Требования
+
+- Ubuntu 22.04, ~40 ГБ свободного места
+- 4+ ядра, 8 ГБ ОЗУ (в виртуальной машине — с включённым 3D-ускорением)
+- Установка занимает 1.5–2 часа, основное время — сборка ArduPilot
+
+## Установка с нуля
+
+Порядок важен: каждый слой ставится и проверяется отдельно. Не переходи к
+следующему шагу, пока не прошла проверка текущего.
+
+### 0. Переменные окружения
+
+Добавь в `~/.bashrc` сразу — на них опираются все шаги ниже:
+
+```bash
+cat >> ~/.bashrc << 'EOF'
+
+# ArduPilot
+export PATH=$PATH:$HOME/ardupilot/Tools/autotest
+export PATH=$HOME/.local/bin:$PATH          # сюда pip ставит mavproxy.py
+
+# Gazebo Harmonic + ardupilot_gazebo
+export GZ_VERSION=harmonic
+export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/ardupilot_gazebo/build:$GZ_SIM_SYSTEM_PLUGIN_PATH
+export GZ_SIM_RESOURCE_PATH=$HOME/ardupilot_gazebo/models:$HOME/ardupilot_gazebo/worlds:$GZ_SIM_RESOURCE_PATH
+
+# ROS 2
+source /opt/ros/humble/setup.bash
+EOF
+```
+
+Установочный скрипт ArduPilot правит `~/.profile`, а он читается только при
+входе в систему — поэтому пути дублируются здесь явно. `GZ_SIM_RESOURCE_PATH`
+обязателен: модель дрона ссылается на `iris_with_standoffs` и `gimbal` из
+`ardupilot_gazebo`, и без этого пути Gazebo откроется **без дрона**, не
+сообщив об ошибке.
+
+Строку с ROS раскомментируется само после шага 4 — до установки она даст
+безобидную ошибку «файл не найден».
 
 ### 1. ArduPilot + SITL
 
@@ -79,15 +118,15 @@ Tools/environment_install/install-prereqs-ubuntu.sh -y
 ./waf configure --board sitl && ./waf copter
 ```
 
-Добавить в `~/.bashrc`:
+**Проверка** (новый терминал):
 
 ```bash
-export PATH=$PATH:$HOME/ardupilot/Tools/autotest
-export PATH=$HOME/.local/bin:$PATH      # здесь лежит mavproxy.py
+which sim_vehicle.py mavproxy.py     # оба должны найтись
+sim_vehicle.py -v ArduCopter --console -w
 ```
 
-Проверка: `sim_vehicle.py -v ArduCopter --console -w`, затем в MAVProxy
-`mode guided` → `arm throttle` → `takeoff 10`.
+В консоли MAVProxy: `mode guided` → `arm throttle` → `takeoff 10`. Высота
+должна расти. Флаг `-w` стирает параметры, нужен только при первом запуске.
 
 ### 2. Gazebo Harmonic
 
@@ -99,7 +138,8 @@ echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-
 sudo apt update && sudo apt install -y gz-harmonic
 ```
 
-Проверка: `gz sim -v4 -r shapes.sdf`
+**Проверка:** `gz sim -v4 -r shapes.sdf` — должна открыться сцена с фигурами.
+В виртуальной машине может потребоваться `--render-engine ogre`.
 
 ### 3. Плагин ardupilot_gazebo
 
@@ -109,21 +149,25 @@ sudo apt install -y libgz-sim8-dev rapidjson-dev libopencv-dev \
   gstreamer1.0-plugins-bad gstreamer1.0-libav gstreamer1.0-gl
 
 cd ~ && git clone https://github.com/ArduPilot/ardupilot_gazebo
-cd ardupilot_gazebo && export GZ_VERSION=harmonic
-mkdir build && cd build
+cd ardupilot_gazebo && mkdir build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=RelWithDebInfo && make -j2
 ```
 
-В `~/.bashrc`:
+`libgz-sim8-dev` — это именно Harmonic. В части руководств встречается
+`libgz-sim7-dev` от Garden, с ним плагин не собирается. `-j2`, а не `-j4`:
+в VM с 8 ГБ параллельная сборка падает по памяти.
+
+**Проверка** — два терминала:
 
 ```bash
-export GZ_VERSION=harmonic
-export GZ_SIM_SYSTEM_PLUGIN_PATH=$HOME/ardupilot_gazebo/build:$GZ_SIM_SYSTEM_PLUGIN_PATH
-export GZ_SIM_RESOURCE_PATH=$HOME/ardupilot_gazebo/models:$HOME/ardupilot_gazebo/worlds:$GZ_SIM_RESOURCE_PATH
+gz sim -v4 -r --render-engine ogre iris_runway.sdf
+```
+```bash
+sim_vehicle.py -v ArduCopter -f gazebo-iris --model JSON --console
 ```
 
-`libgz-sim8-dev` — это именно Harmonic. В части руководств встречается
-`libgz-sim7-dev` от Garden, с ним плагин не собирается.
+В MAVProxy `mode guided` → `arm throttle` → `takeoff 5`: коптер должен
+физически подняться в окне Gazebo. Это ключевая точка установки.
 
 ### 4. ROS 2 Humble
 
@@ -135,14 +179,17 @@ export ROS_APT_SOURCE_VERSION=$(curl -s \
 curl -L -o /tmp/ros2-apt-source.deb \
   "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo $VERSION_CODENAME)_all.deb"
 sudo dpkg -i /tmp/ros2-apt-source.deb
-sudo apt update && sudo apt install -y ros-humble-desktop ros-dev-tools
-echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+sudo apt update && sudo apt install -y ros-humble-desktop ros-dev-tools python3-yaml
 ```
 
-Подключение репозитория ROS через deb-пакет `ros2-apt-source` — актуальный
-способ; инструкции с ручной правкой `sources.list` и ключом `ros.key` устарели.
+Репозиторий ROS подключается deb-пакетом `ros2-apt-source`; инструкции с
+ручной правкой `sources.list` и ключом `ros.key` устарели. `python3-yaml`
+нужен генератору сцены.
 
-### 5. MAVROS и мост
+**Проверка** — два терминала: `ros2 run demo_nodes_cpp talker` и
+`ros2 run demo_nodes_py listener`.
+
+### 5. MAVROS
 
 ```bash
 sudo apt install -y ros-humble-mavros ros-humble-mavros-extras \
@@ -153,36 +200,59 @@ chmod +x install_geographiclib_datasets.sh && sudo ./install_geographiclib_datas
 
 Датасеты GeographicLib обязательны, без них `mavros_node` падает при старте.
 
+**Проверка** — к двум терминалам из шага 3 добавь:
+
+```bash
+ros2 launch mavros apm.launch fcu_url:=udp://:14550@
+```
+```bash
+ros2 topic echo /mavros/state --once
+```
+
+Нужно `connected: true`.
+
 ### 6. Этот репозиторий
-Репозиторий обязан лежать внутри `src/` ROS-воркспейса — `run.sh` определяет корень воркспейса как две директории вверх от себя.
+
+> Репозиторий обязан лежать внутри `src/` ROS-воркспейса: `run.sh` определяет
+> корень воркспейса как две директории вверх от себя.
+
 ```bash
 mkdir -p ~/ros2_ws/src && cd ~/ros2_ws/src
-git clone <URL этого репозитория> building-avoidance
+git clone https://github.com/Injenus/building-avoidance.git
 cd ~/ros2_ws && colcon build --symlink-install
 source install/setup.bash
 ```
 
-### 7. Проверка
+### 7. Финальная проверка
 
 ```bash
-echo $GZ_SIM_RESOURCE_PATH | grep ardupilot_gazebo   # не должно быть пусто
-which sim_vehicle.py mavproxy.py                      # оба должны найтись
-ros2 pkg list | grep avoidance                        # два пакета
+echo $GZ_SIM_RESOURCE_PATH | grep -q ardupilot_gazebo && echo "модели OK" || echo "НЕТ пути к моделям"
+which sim_vehicle.py mavproxy.py
+ros2 pkg list | grep avoidance      # должно быть два пакета
 ```
-
-Первая строка критична: без пути к моделям `ardupilot_gazebo` сцена откроется
-без дрона и без сообщения об ошибке. Переменные из шагов 1 и 3 должны быть
-в `~/.bashrc` — новый терминал их подхватит, текущий требует `source ~/.bashrc`.
 
 Полный прогон:
 
 ```bash
-./scripts/run.sh
+cd ~/ros2_ws/src/building-avoidance && ./scripts/run.sh
 ```
 
 Ожидаемая последовательность в логе планировщика: `ожидание связи` →
 `GUIDED` → `арминг` → `взлёт` → `полёт по m-линии` → `встреча` →
 `обход границы` → `цель достигнута` → `посадка`.
+
+### Типичные ошибки
+
+| Симптом | Причина |
+|---|---|
+| `sim_vehicle.py: command not found` | нет PATH из шага 0, или терминал открыт до правки `.bashrc` |
+| `[Errno 2] No such file: 'mavproxy.py'` | в PATH нет `~/.local/bin` |
+| В Gazebo только здания, дрона нет | `GZ_SIM_RESOURCE_PATH` без `~/ardupilot_gazebo/models` |
+| Gazebo стартует и сразу закрывается | ogre2 не поддерживается видеоадаптером, нужен `--render-engine ogre` |
+| `PreArm: Motors: Check frame class` | не подключился `sitl.parm` |
+| `/scan` публикует нули | сенсоры рендерятся ogre1; нужен ogre2 + `LIBGL_ALWAYS_SOFTWARE=1` |
+| `mavros: connected: false` | занят порт 14550, проверь `ss -ulpn \| grep 14550` |
+| Дрон долетает очень медленно | низкий RTF; логика не страдает, расчёты в модельном времени |
 
 ---
 
