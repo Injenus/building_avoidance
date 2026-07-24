@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.bak
+*.tlog
+*.tlog.raw
+logs/
+*.BIN
+.vscode/
+.idea/
