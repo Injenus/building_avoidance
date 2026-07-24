@@ -6,7 +6,7 @@
 
 Целевая точка задаётся параметром запуска, правка кода не требуется.
 
-**Видео демонстрации:** `https://drive.google.com/file/d/1F_XarFJ8MXqkjw09EklaP-_HONLjiJE9/view?usp=drive_link`
+**Видео демонстрации:** https://drive.google.com/file/d/1F_XarFJ8MXqkjw09EklaP-_HONLjiJE9/view?usp=drive_link
 
 ---
 
